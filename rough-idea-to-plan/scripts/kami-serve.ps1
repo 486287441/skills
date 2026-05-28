@@ -52,15 +52,16 @@ if (-not (Test-Path $servePy)) {
     if (Test-Path $bundled) { $servePy = $bundled }
 }
 
+# Windows: 勿把含中文路径放进 ArgumentList，用 WorkingDirectory + "."（见 html-mode-skill）
 if ((Test-Path $servePy) -and (Get-Command python -ErrorAction SilentlyContinue)) {
-    Start-Preview -Exe 'python' -PreviewArgs @($servePy, $dir, "$Port") -WorkDir $dir -P $Port
+    Start-Preview -Exe 'python' -PreviewArgs @($servePy, '.', "$Port") -WorkDir $dir -P $Port
     Write-Host "Kami preview: http://localhost:$Port"
     Write-Host "Serving: $dir"
     exit 0
 }
 
 if ((Test-Path $servePy) -and (Get-Command py -ErrorAction SilentlyContinue)) {
-    Start-Preview -Exe 'py' -PreviewArgs @('-3', $servePy, $dir, "$Port") -WorkDir $dir -P $Port
+    Start-Preview -Exe 'py' -PreviewArgs @('-3', $servePy, '.', "$Port") -WorkDir $dir -P $Port
     Write-Host "Kami preview: http://localhost:$Port"
     Write-Host "Serving: $dir"
     exit 0

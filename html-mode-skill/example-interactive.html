@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HTML Mode 参考 · 一致性哈希讲解器</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Serif+SC:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f5f4ed;
+    --paper-2: #efeee5;
+    --ink: #1f1d18;
+    --muted: #6b665b;
+    --rule: #d4d1c5;
+    --accent: #1B365D;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Source Serif Pro', 'Noto Serif SC', Georgia, serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .page { max-width: 920px; margin: 0 auto; padding: 3.5rem 2.5rem 4rem; }
+  .folio {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 1px solid var(--rule); padding-bottom: 0.75rem;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted);
+  }
+  h1 { font-size: clamp(2rem, 5vw, 2.75rem); font-weight: 500; line-height: 1.15; margin: 1.5rem 0 0.5rem; }
+  .lede { font-size: 1.15rem; color: #3a382f; max-width: 42rem; margin-bottom: 2rem; }
+  h2 { font-size: 1.35rem; font-weight: 500; margin: 2.5rem 0 1rem; border-top: 1px solid var(--rule); padding-top: 1.5rem; }
+  .tag {
+    display: inline-block; padding: 3px 10px; font-size: 11px;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    background: var(--paper-2); color: var(--accent);
+  }
+  /* Concept explainer */
+  .concept-explainer {
+    border: 1px solid var(--rule);
+    background: var(--paper-2);
+    padding: 1.25rem 1.5rem 1.5rem;
+    margin: 1rem 0 2rem;
+  }
+  .concept-explainer h3 { margin: 0 0 0.35rem; font-size: 1.2rem; font-weight: 500; color: var(--accent); }
+  .concept-explainer .sub { font-size: 0.9rem; color: var(--muted); margin-bottom: 1rem; }
+  .explainer-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 720px) { .explainer-grid { grid-template-columns: 1fr; } }
+  .explainer-viz {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    padding: 0.75rem;
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .explainer-viz svg { max-width: 100%; height: auto; }
+  .explainer-metrics {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    padding: 1rem 1.25rem;
+  }
+  .metric-value {
+    font-size: 2.5rem; font-weight: 500; color: var(--accent);
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+  }
+  .metric-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; }
+  .metric-row { margin-bottom: 1.25rem; }
+  .explainer-controls {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--rule);
+  }
+  button {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 0.45rem 0.85rem;
+    background: var(--paper); color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 4px;
+    cursor: pointer;
+  }
+  button:hover { background: var(--paper-2); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.danger { color: #5c3d3d; border-color: #9a8a8a; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; margin: 1rem 0; }
+  th, td { border: 1px solid var(--rule); padding: 0.5rem 0.75rem; text-align: left; }
+  th { background: var(--paper-2); color: var(--accent); font-weight: 500; }
+  dl.terms { margin: 0; }
+  dl.terms dt { font-weight: 500; color: var(--accent); margin-top: 0.75rem; }
+  dl.terms dd { margin: 0.25rem 0 0 0; color: #3a382f; }
+  .node-circle { cursor: pointer; transition: fill 0.15s; }
+  .node-circle:hover { fill: #2a4a73; }
+  .key-dot { fill: var(--muted); opacity: 0.85; }
+  .key-dot.migrated { fill: var(--accent); }
+  .colophon {
+    margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="folio">
+    <span>HTML Mode · 参考</span>
+    <span>概念讲解器</span>
+    <span>端口 3001</span>
+  </header>
+  <span class="tag">研究 · 学习</span>
+  <h1>一致性哈希 · 可交互讲解</h1>
+  <p class="lede">本页为 <strong>html-mode-skill</strong> 的参考样板：左侧哈希环可增删节点，右侧实时显示 key 迁移量；下方附对比表与术语表。正式答复请把同类结构写进 <code>对话 html/index.html</code>。</p>
+
+  <h2>一、概念讲解器</h2>
+  <section class="concept-explainer" aria-label="一致性哈希讲解器">
+    <h3>一致性哈希环</h3>
+    <p class="sub">点击环节点可选中；添加/移除节点后，仅重新映射相邻区间的 key。</p>
+    <div class="explainer-grid">
+      <div class="explainer-viz" id="ring-host">
+        <svg id="hash-ring" viewBox="0 0 320 320" width="300" height="300" role="img" aria-label="哈希环示意图">
+          <circle cx="160" cy="160" r="120" fill="none" stroke="#d4d1c5" stroke-width="2"/>
+          <g id="keys-layer"></g>
+          <g id="nodes-layer"></g>
+        </svg>
+      </div>
+      <div class="explainer-metrics">
+        <div class="metric-row">
+          <div class="metric-value" id="metric-migrated">0</div>
+          <div class="metric-label">需要迁移的 key 数量（共 <span id="metric-total">48</span> 个）</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-value" id="metric-pct">0%</div>
+          <div class="metric-label">占全部 key 的比例</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-value" id="metric-nodes">3</div>
+          <div class="metric-label">环上物理节点数</div>
+        </div>
+        <p style="font-size:0.88rem;color:var(--muted);margin:0">上次操作：<span id="metric-action">—</span></p>
+      </div>
+    </div>
+    <div class="explainer-controls">
+      <button type="button" id="btn-add">添加节点</button>
+      <button type="button" id="btn-remove" class="danger">移除选中</button>
+      <button type="button" id="btn-reset">重置为 3 节点</button>
+    </div>
+  </section>
+
+  <h2>二、方案对比</h2>
+  <table>
+    <thead>
+      <tr><th>方案</th><th>扩缩容时 key 迁移</th><th>负载均衡</th><th>典型场景</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>取模 <code>N</code></td><td>几乎全部重映射</td><td>均匀（节点同质时）</td><td>固定分片、小规模缓存</td></tr>
+      <tr><td>一致性哈希</td><td>约 <code>1/n</code>（理想）</td><td>依赖虚拟节点</td><td>分布式缓存、对象存储元数据</td></tr>
+      <tr><td>有界负载一致性哈希</td><td>略高于纯 CH</td><td>可限制热点</td><td>节点异构、倾斜 key</td></tr>
+    </tbody>
+  </table>
+
+  <h2>三、术语表</h2>
+  <dl class="terms">
+    <dt>哈希环</dt>
+    <dd>将哈希空间首尾相接，节点与 key 均映射到环上同一坐标系。</dd>
+    <dt>顺时针后继</dt>
+    <dd>key 归属环上顺时针方向遇到的第一个节点（含虚拟节点）。</dd>
+    <dt>虚拟节点（vnode）</dt>
+    <dd>一个物理节点在环上的多个占位，用于打散热点、改善均衡。</dd>
+    <dt>迁移 key</dt>
+    <dd>拓扑变化后，归属节点发生变化的 key；本演示用简化区间模型估算。</dd>
+  </dl>
+
+  <footer class="colophon">
+    <span>example-interactive.html</span>
+    <span>勿提交 PRD 表单</span>
+  </footer>
+</div>
+<script>
+(function () {
+  const KEY_COUNT = 48;
+  const R = 120, CX = 160, CY = 160;
+  let nodes = [0, 120, 240].map((deg, i) => ({ id: i + 1, deg }));
+  let selectedId = null;
+  let lastMigrated = 0;
+  let lastAction = '—';
+
+  const svg = document.getElementById('hash-ring');
+  const keysLayer = document.getElementById('keys-layer');
+  const nodesLayer = document.getElementById('nodes-layer');
+
+  function degToRad(d) { return (d - 90) * Math.PI / 180; }
+  function pos(deg) {
+    const r = degToRad(deg);
+    return { x: CX + R * Math.cos(r), y: CY + R * Math.sin(r) };
+  }
+  function norm(d) { return ((d % 360) + 360) % 360; }
+  function sortedNodes() {
+    return [...nodes].sort((a, b) => norm(a.deg) - norm(b.deg));
+  }
+  function ownerForKey(keyDeg) {
+    const sn = sortedNodes();
+    if (!sn.length) return null;
+    const k = norm(keyDeg);
+    for (const n of sn) if (norm(n.deg) >= k) return n.id;
+    return sn[0].id;
+  }
+  function keyDegrees() {
+    const out = [];
+    for (let i = 0; i < KEY_COUNT; i++) out.push((i * 360 / KEY_COUNT + 7) % 360);
+    return out;
+  }
+  function computeOwners() {
+    const kd = keyDegrees();
+    return kd.map((deg, i) => ({ i, deg, owner: ownerForKey(deg) }));
+  }
+  function countMigrated(before, after) {
+    if (!before) return 0;
+    let c = 0;
+    for (let i = 0; i < before.length; i++) if (before[i].owner !== after[i].owner) c++;
+    return c;
+  }
+  function applyTopologyChange(mutate) {
+    const before = computeOwners();
+    mutate();
+    const after = computeOwners();
+    lastMigrated = countMigrated(before, after);
+    render();
+  }
+
+  function render() {
+    const owners = computeOwners();
+
+    keysLayer.innerHTML = '';
+    owners.forEach(({ deg }) => {
+      const p = pos(deg);
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', p.x); c.setAttribute('cy', p.y);
+      c.setAttribute('r', 4); c.setAttribute('class', 'key-dot');
+      keysLayer.appendChild(c);
+    });
+
+    nodesLayer.innerHTML = '';
+    nodes.forEach(n => {
+      const p = pos(n.deg);
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', p.x); c.setAttribute('cy', p.y);
+      c.setAttribute('r', selectedId === n.id ? 14 : 11);
+      c.setAttribute('fill', selectedId === n.id ? '#1B365D' : '#6b665b');
+      c.setAttribute('class', 'node-circle');
+      c.addEventListener('click', () => {
+        selectedId = selectedId === n.id ? null : n.id;
+        render();
+      });
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', p.x); t.setAttribute('y', p.y + 4);
+      t.setAttribute('text-anchor', 'middle'); t.setAttribute('fill', '#f5f4ed');
+      t.setAttribute('font-size', '10'); t.setAttribute('font-family', 'IBM Plex Mono, monospace');
+      t.textContent = 'N' + n.id;
+      nodesLayer.appendChild(c);
+      nodesLayer.appendChild(t);
+    });
+
+    document.getElementById('metric-migrated').textContent = lastMigrated;
+    document.getElementById('metric-pct').textContent = Math.round(lastMigrated / KEY_COUNT * 100) + '%';
+    document.getElementById('metric-nodes').textContent = nodes.length;
+    document.getElementById('metric-total').textContent = KEY_COUNT;
+    document.getElementById('metric-action').textContent = lastAction;
+  }
+
+  document.getElementById('btn-add').addEventListener('click', () => {
+    const used = new Set(nodes.map(n => Math.round(n.deg)));
+    let deg = Math.floor(Math.random() * 360);
+    for (let t = 0; t < 360 && used.has(deg); t++) deg = (deg + 37) % 360;
+    const id = Math.max(0, ...nodes.map(n => n.id)) + 1;
+    applyTopologyChange(() => {
+      nodes.push({ id, deg });
+      selectedId = id;
+    });
+    lastAction = `添加 N${id} → ${lastMigrated} keys 迁移`;
+    document.getElementById('metric-action').textContent = lastAction;
+  });
+  document.getElementById('btn-remove').addEventListener('click', () => {
+    if (!selectedId || nodes.length <= 1) return;
+    applyTopologyChange(() => {
+      nodes = nodes.filter(n => n.id !== selectedId);
+      selectedId = null;
+    });
+    lastAction = `移除节点 → ${lastMigrated} keys 迁移`;
+    document.getElementById('metric-action').textContent = lastAction;
+  });
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    nodes = [0, 120, 240].map((deg, i) => ({ id: i + 1, deg }));
+    selectedId = null;
+    lastMigrated = 0;
+    lastAction = '已重置';
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
